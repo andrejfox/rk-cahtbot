@@ -1,9 +1,6 @@
 Sledeča navodila predvidevajo da imate navoljo java in javac,
 ter da izvajate ukaze znotraj direktorija teh navodil
 
-Alternativno imam repozitory z nalogo na Githubu:
-https://github.com/andrejfox/rk-cahtbot
-
 Najprej vse datoteke prevedemo:
 `javac -cp .:json-simple-1.1.1.jar *.java`
 
