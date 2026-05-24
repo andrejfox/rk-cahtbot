@@ -5,6 +5,8 @@ import java.sql.Struct;
 import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.Scanner;
+import javax.net.ssl.*;
+import java.security.cert.X509Certificate;
 
 public class ChatClient extends Thread
 {
@@ -15,28 +17,98 @@ public class ChatClient extends Thread
 	}
 
 	public ChatClient() throws Exception {
-        Socket socket = null;
+        SSLSocket socket = null;
         DataInputStream in = null;
         DataOutputStream out = null;
+        String username = "";
 
-        System.out.print("Enter username: ");
+        System.out.print("Choose user (andrej/miha/joze): ");
         Scanner sc = new Scanner(System.in);
-        String username = sc.next();
+        String selectedUser = sc.next();
+
+        System.setProperty(
+                "javax.net.ssl.keyStore",
+                "src/main/resources/certs/" +
+                        selectedUser +
+                        "-keystore.p12"
+        );
+
+        System.setProperty(
+                "javax.net.ssl.keyStorePassword",
+                "password"
+        );
+
+        System.setProperty(
+                "javax.net.ssl.trustStore",
+                "src/main/resources/certs/" +
+                        selectedUser +
+                        "-truststore.p12"
+        );
+
+        System.setProperty(
+                "javax.net.ssl.trustStorePassword",
+                "password"
+        );
 
         // connect to the chat server
         try {
+
             System.out.println("[system] connecting to chat server ...");
-            socket = new Socket("localhost", serverPort); // create socket connection
-            in = new DataInputStream(socket.getInputStream()); // create input stream for listening for incoming messages
-            out = new DataOutputStream(socket.getOutputStream()); // create output stream for sending messages
 
-            Message message = new Message(Message.Type.SenderName, username, "", "");
-            this.sendMessage(message, out);
+            SSLSocketFactory factory =
+                    (SSLSocketFactory)
+                            SSLSocketFactory.getDefault();
 
-            System.out.println("[system] connected");
+            socket =
+                    (SSLSocket)
+                            factory.createSocket(
+                                    "localhost",
+                                    serverPort
+                            );
 
-            ChatClientMessageReceiver message_receiver = new ChatClientMessageReceiver(in); // create a separate thread for listening to messages from the chat server
-            message_receiver.start(); // run the new thread
+
+            socket.setEnabledProtocols(
+                    new String[]{"TLSv1.2"}
+            );
+
+            socket.setEnabledCipherSuites(
+                    new String[]{
+                            "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+                    }
+            );
+
+            socket.startHandshake();
+
+            SSLSession session =
+                    socket.getSession();
+
+            X509Certificate cert =
+                    (X509Certificate)
+                            session.getLocalCertificates()[0];
+
+            String dn =
+                    cert.getSubjectX500Principal().getName();
+
+            username =
+                    dn.split("=")[1];
+
+            in = new DataInputStream(
+                    socket.getInputStream()
+            );
+
+            out = new DataOutputStream(
+                    socket.getOutputStream()
+            );
+
+            System.out.println(
+                    "[system] connected as " + username
+            );
+
+            ChatClientMessageReceiver message_receiver =
+                    new ChatClientMessageReceiver(in);
+
+            message_receiver.start();
+
         } catch (Exception e) {
             e.printStackTrace(System.err);
             System.exit(1);
@@ -53,7 +125,6 @@ public class ChatClient extends Thread
             type = switch (input[0]) {
                 case "public", "pu" -> Message.Type.Public;
                 case "private", "pr" -> Message.Type.Private;
-                case "name", "n" -> Message.Type.SenderName;
                 case "err", "e" -> Message.Type.Error;
                 default -> {
                     System.out.print("Invalid type!\n>");
@@ -65,31 +136,56 @@ public class ChatClient extends Thread
 
         Message message;
 
-        switch (type) {
-            case Private -> {
-                try {
-                    input = input[1].split(" ", 2);
-                    message = new Message(type, username, input[0], input[1]);
-                } catch (ArrayIndexOutOfBoundsException e) {
-                    message = new Message(type, username, input[0], "");
+            switch (type) {
+
+                case Private -> {
+                    try {
+                        input = input[1].split(" ", 2);
+
+                        message = new Message(
+                                type,
+                                username,
+                                input[0],
+                                input[1]
+                        );
+
+                    } catch (ArrayIndexOutOfBoundsException e) {
+
+                        message = new Message(
+                                type,
+                                username,
+                                input[0],
+                                ""
+                        );
+                    }
+                }
+
+                case Public, Error -> {
+                    try {
+
+                        message = new Message(
+                                type,
+                                username,
+                                null,
+                                input[1]
+                        );
+
+                    } catch (ArrayIndexOutOfBoundsException e) {
+
+                        message = new Message(
+                                type,
+                                username,
+                                null,
+                                ""
+                        );
+                    }
+                }
+
+                default -> {
+                    System.out.print("invalid message type!\n>");
+                    continue;
                 }
             }
-            case Public, Error -> {
-                try {
-                    message = new Message(type, username, null, input[1]);
-                } catch (ArrayIndexOutOfBoundsException e) {
-                    message = new Message(type, username, null, "");
-                }
-            }
-            case SenderName -> {
-                username = input[1];
-                message = new Message(type, username, "", "");
-            }
-            default -> {
-                System.out.print("invalid message type!\n>");
-                continue;
-            }
-        }
 
             this.sendMessage(message, out); // send the message to the chat server
     }

@@ -4,8 +4,8 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
 public class Message {
+
     public enum Type {
-        SenderName,
         Public,
         Private,
         Error
@@ -17,7 +17,12 @@ public class Message {
     public String body;
     public String recipient;
 
-    public Message(Type type, String sender, String recipient, String body) {
+    public Message(
+            Type type,
+            String sender,
+            String recipient,
+            String body
+    ) {
         this.type = type;
         this.sender = sender;
         this.recipient = recipient;
@@ -27,6 +32,7 @@ public class Message {
 
     @SuppressWarnings("unchecked")
     public String toJson() {
+
         JSONObject obj = new JSONObject();
 
         obj.put("type", type.name());
@@ -41,19 +47,38 @@ public class Message {
         return obj.toJSONString();
     }
 
-    public static Message fromJson(String json) throws Exception {
+    public static Message fromJson(String json)
+            throws Exception {
+
         JSONParser parser = new JSONParser();
-        JSONObject obj = (JSONObject) parser.parse(json);
 
-        Type type = Type.valueOf((String) obj.get("type"));
-        String sender = (String) obj.get("sender");
-        String recipient = (String) obj.get("recipient");
-        String body = (String) obj.get("body");
+        JSONObject obj =
+                (JSONObject) parser.parse(json);
 
-        Message msg = new Message(type, sender, recipient,  body);
+        Type type =
+                Type.valueOf(
+                        (String) obj.get("type")
+                );
 
-        msg.time = (String) obj.get("time");
-        msg.recipient = (String) obj.get("recipient");
+        String sender =
+                (String) obj.get("sender");
+
+        String recipient =
+                (String) obj.get("recipient");
+
+        String body =
+                (String) obj.get("body");
+
+        Message msg =
+                new Message(
+                        type,
+                        sender,
+                        recipient,
+                        body
+                );
+
+        msg.time =
+                (String) obj.get("time");
 
         return msg;
     }
